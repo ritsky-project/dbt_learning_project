@@ -2,7 +2,7 @@ version: 2
 
 sources:
   - name: bronze
-    database: Dbt_DB
+    database: TestDB
     schema: bronze
 
     tables:

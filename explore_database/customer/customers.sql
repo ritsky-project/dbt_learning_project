@@ -781,7 +781,7 @@ FROM bronze.customers ;
 SELECT 
     COUNT(*) phone_null_count
 FROM bronze.customers 
-WHERE phone IS NULL;
+WHERE phone IS NULL OR phone = '';
 
 -- account_created_date structural pattern profiling
 WITH phone_pattern AS 
@@ -806,39 +806,130 @@ FROM phone_pattern
 
 -- identify +1 standardized US phone numbers
 SELECT 
-    phone
+    TRIM(phone)
 FROM bronze.customers
-WHERE phone LIKE '+1__________' ;
+WHERE TRIM(phone) LIKE '+1__________' ;
 
 -- format canonical US phone numbers into readable display format
 SELECT 
 CONCAT
     (
-        '+1 (', SUBSTRING(phone,3, 3), ') ',
-        SUBSTRING(phone, 6, 3), '-',
-        SUBSTRING(phone, 9, 4)
+        '+1 (', SUBSTRING(TRIM(phone),3, 3), ') ',
+        SUBSTRING(TRIM(phone), 6, 3), '-',
+        SUBSTRING(TRIM(phone), 9, 4)
     )
 FROM bronze.customers
-WHERE phone LIKE '+1__________';
+WHERE TRIM(phone) LIKE '+1__________';
 
------------------------------------------------
+-- identify raw 10-digit US phone numbers
 SELECT 
-    phone 
+    TRIM(phone)
 FROM bronze.customers
-WHERE phone LIKE '__________' ;
+WHERE TRIM(phone) LIKE '__________' ;
 
+-- format raw US phone numbers into standard display format
 SELECT 
-CONCAT('+1 (', SUBSTRING(phone, 1 ,3), ') ', SUBSTRING(phone, 4 ,3), '-', SUBSTRING(phone, 7, 4))
+    CONCAT('+1 (', SUBSTRING(TRIM(phone), 1 ,3), ') ', SUBSTRING(TRIM(phone), 4 ,3), '-', SUBSTRING(TRIM(phone), 7, 4))
 FROM bronze.customers
-WHERE phone LIKE '__________' ;
------------------------------------------------
+WHERE TRIM(phone) LIKE '__________' ;
+
+-- identify dash-formatted US phone numbers
+SELECT 
+    TRIM(phone)
+FROM bronze.customers
+WHERE TRIM(phone) LIKE '___-___-____' ;
+
+-- standardize dash-formatted phone numbers into US display format
+SELECT 
+    CONCAT('+1 (', SUBSTRING(TRIM(phone), 1, 3), ') ', SUBSTRING(TRIM(phone), 5, 3),SUBSTRING(TRIM(phone), 8 ,5))
+FROM bronze.customers
+WHERE TRIM(phone) LIKE '___-___-____' ;
+
+-- identify dot-formatted US phone numbers
+SELECT 
+    TRIM(phone)
+FROM bronze.customers
+WHERE TRIM(phone) LIKE '___.___.____' ;
+
+-- standardize dot-formatted phone numbers into US display format
+SELECT 
+    CONCAT('+1 (', SUBSTRING(TRIM(phone), 1, 3), ') ', SUBSTRING(TRIM(phone), 5, 3), '-', SUBSTRING(TRIM(phone),9, 4))
+FROM bronze.customers
+WHERE TRIM(phone) LIKE '___.___.____' ;
+
+-- identify parenthesized US phone numbers
+SELECT
+    TRIM(phone)
+FROM bronze.customers
+WHERE TRIM(phone) LIKE '(___) ___-____' ;
+
+-- normalize parenthesized phone numbers into canonical US format
+SELECT 
+    CONCAT('+1 ', SUBSTRING(TRIM(phone), 1, 14))
+FROM bronze.customers
+WHERE TRIM(phone) LIKE '(___) ___-____' ;
+
+-- identify invalid 9-digit phone numbers caused by incomplete or malformed source data
+SELECT
+    TRIM(phone)
+FROM bronze.customers
+WHERE TRIM(phone) LIKE '_________' ; 
+
+-- identify malformed international phone numbers with missing US country code structure
+SELECT
+    TRIM(phone)
+FROM bronze.customers
+WHERE TRIM(phone) LIKE '+__________' ;
+
+-- identify invalid parenthesized phone numbers with incomplete area codes
+SELECT
+    TRIM(phone)
+FROM bronze.customers
+WHERE TRIM(phone) LIKE '(__) ___-____' ;
+
+-- identify malformed dot-formatted phone numbers with incomplete area codes
+SELECT
+    TRIM(phone)
+FROM bronze.customers
+WHERE TRIM(phone) LIKE '__.___.____' ;
+
+-- identify suspicious dash-formatted values resembling non-standard US phone structures
+SELECT
+    TRIM(phone)
+FROM bronze.customers
+WHERE TRIM(phone) LIKE '___-__-____' ;
+
+-- identify suspicious dash-formatted values resembling non-standard US phone structures
+SELECT
+    TRIM(phone)
+FROM bronze.customers
+WHERE TRIM(phone) LIKE '___-__-____' ;
+
+-- identify malformed dot-formatted phone numbers with incomplete digit grouping
+SELECT
+    TRIM(phone)
+FROM bronze.customers
+WHERE TRIM(phone) LIKE '___.__.____' ;
+
 -- final phone column in  usa phone standardization format
 SELECT
     CASE 
-        WHEN phone LIKE '+1__________' THEN CONCAT('+1 (', SUBSTRING(phone, 3, 3), ') ', SUBSTRING(phone, 6, 3),'-',SUBSTRING(phone,9,4))
+        WHEN TRIM(phone) LIKE '+1__________'   THEN CONCAT('+1 (', SUBSTRING(TRIM(phone), 3, 3), ') ', SUBSTRING(TRIM(phone), 6, 3),'-',SUBSTRING(TRIM(phone),9,4))
+        WHEN TRIM(phone) LIKE '__________'     THEN CONCAT('+1 (', SUBSTRING(TRIM(phone), 1 ,3), ') ', SUBSTRING(TRIM(phone), 4 ,3), '-', SUBSTRING(TRIM(phone), 7, 4))
+        WHEN TRIM(phone) LIKE '___-___-____'   THEN CONCAT('+1 (', SUBSTRING(TRIM(phone), 1, 3), ') ', SUBSTRING(TRIM(phone), 5, 3),SUBSTRING(TRIM(phone), 8 ,5))
+        WHEN TRIM(phone) LIKE '___.___.____'   THEN CONCAT('+1 (', SUBSTRING(TRIM(phone), 1, 3), ') ', SUBSTRING(TRIM(phone), 5, 3), '-', SUBSTRING(TRIM(phone),9, 4))
+        WHEN TRIM(phone) LIKE '(___) ___-____' THEN CONCAT('+1 ', SUBSTRING(TRIM(phone), 1, 14))
+        WHEN TRIM(phone) IS NULL OR TRIM(phone) = '' THEN 'Unknown'
+        ELSE 'Unknown'
     END  as usa_phone_pattern
 FROM bronze.customers
-WHERE phone LIKE '+1__________';
+WHERE TRIM(phone) LIKE '+1__________'
+OR    TRIM(phone) LIKE '__________' 
+OR    TRIM(phone) LIKE '___-___-____'
+OR    TRIM(phone) LIKE '___.___.____'
+OR    TRIM(phone) LIKE '(___) ___-____'
+OR    TRIM(phone) = ''
+OR    TRIM(phone) IS NULL;
 
 --#############################################################################################
 --############################## CUSTOEMR CLEAN DATA ##########################################
@@ -867,7 +958,15 @@ SELECT TOP (1000) [customer_id]
 
         ,[email]
 
-        ,[phone]
+        ,CASE 
+            WHEN TRIM(phone) LIKE '+1__________'   THEN CONCAT('+1 (', SUBSTRING(TRIM(phone), 3, 3), ') ', SUBSTRING(TRIM(phone), 6, 3),'-',SUBSTRING(TRIM(phone),9,4))
+            WHEN TRIM(phone) LIKE '__________'     THEN CONCAT('+1 (', SUBSTRING(TRIM(phone), 1 ,3), ') ', SUBSTRING(TRIM(phone), 4 ,3), '-', SUBSTRING(TRIM(phone), 7, 4))
+            WHEN TRIM(phone) LIKE '___-___-____'   THEN CONCAT('+1 (', SUBSTRING(TRIM(phone), 1, 3), ') ', SUBSTRING(TRIM(phone), 5, 3),SUBSTRING(TRIM(phone), 8 ,5))
+            WHEN TRIM(phone) LIKE '___.___.____'   THEN CONCAT('+1 (', SUBSTRING(TRIM(phone), 1, 3), ') ', SUBSTRING(TRIM(phone), 5, 3), '-', SUBSTRING(TRIM(phone),9, 4))
+            WHEN TRIM(phone) LIKE '(___) ___-____' THEN CONCAT('+1 ', SUBSTRING(TRIM(phone), 1, 14))
+            WHEN TRIM(phone) IS NULL OR TRIM(phone) = '' THEN 'Unknown'
+            ELSE 'Unknown'
+        END  as usa_phone_pattern
 
         ,CASE 
             WHEN [address] IS NULL OR [address] = '' THEN 'Unknown'

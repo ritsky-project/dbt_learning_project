@@ -285,16 +285,51 @@ FROM category_analysis
 --=============================================================================================
 --=============================== stock_on_hand column cleaning ===============================
 --=============================================================================================
+-- stock_on_hand data overview 
 SELECT 
 stock_on_hand 
-FROM bronze.inventory_snapshots 
+FROM bronze.inventory_snapshots ;
 
---=============================================================================================
---=============================== stock_on_hand column cleaning ===============================
---=============================================================================================
+--stock_on_hand  data profiling 
 SELECT 
-stock_reserved 
-FROM bronze.inventory_snapshots 
+      stock_on_hand 
+FROM  bronze.inventory_snapshots 
+WHERE stock_on_hand IS NULL
+   OR stock_on_hand < 0 
+   OR TRY_CONVERT(INT, stock_on_hand) IS NULL  ;
+
+--Stock_on_hand cleaning and standardization 
+SELECT 
+    CASE 
+        WHEN TRY_CONVERT(INT, stock_on_hand) IS NULL OR stock_on_hand < 0 THEN NULL 
+        ELSE TRY_CONVERT(INT, stock_on_hand)
+    END AS stock_on_hand
+FROM bronze.inventory_snapshots
+WHERE stock_on_hand IS NULL ;
+--=============================================================================================
+--=============================== stock_reserved column cleaning ==============================
+--=============================================================================================
+-- stock_reserved data overview 
+SELECT 
+     stock_reserved 
+FROM bronze.inventory_snapshots ;
+
+-- stock_reserved data profiling 
+SELECT
+      stock_reserved 
+FROM  bronze.inventory_snapshots 
+WHERE stock_reserved IS NULL 
+   OR stock_reserved < 0 
+   OR TRY_CONVERT(INT, stock_reserved) IS NULL ;
+
+-- stock_reserved cleaning and standardization
+SELECT 
+    CASE 
+        WHEN stock_reserved < 0 OR TRY_CONVERT(INT, stock_reserved) IS NULL THEN NULL 
+        ELSE TRY_CONVERT(INT, stock_reserved)
+    END  as stock_reserved
+    FROM bronze.inventory_snapshots 
+WHERE stock_reserved IS NULL ;
 
 --=============================================================================================
 --=============================== stock_on_hand column cleaning ===============================
@@ -378,7 +413,10 @@ SELECT TOP (1000)
         ELSE 'Unknown'
     END AS category
     
-      ,[stock_on_hand]
+    ,CASE 
+        WHEN TRY_CONVERT(INT, stock_on_hand) IS NULL OR stock_on_hand < 0 THEN NULL 
+        ELSE TRY_CONVERT(INT, stock_on_hand)
+    END AS stock_on_hand
 
       ,[stock_reserved]
 

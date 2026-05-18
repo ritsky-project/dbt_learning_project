@@ -290,73 +290,419 @@ SELECT
         ELSE dbo.TitleCase(TRIM(department))
     END AS department
 FROM bronze.products ;
+
+--=============================================================================================
+--================================ base_price_usd  column cleaning ============================
+--=============================================================================================
+-- data profiling for base_price_usd
+SELECT 
+    base_price_usd 
+FROM bronze.products 
+WHERE base_price_usd IS NULL 
+   OR TRY_CONVERT(DECIMAL(10,2), REPLACE(REPLACE(base_price_usd, ',', ''),'$', '')) IS NULL ;
+
+-- base_price_usd cleaning and standardization
+WITH CleanBasePrice AS 
+(
+    SELECT 
+        CASE 
+            WHEN base_price_usd IS NULL OR TRY_CONVERT(DECIMAL(10,2), REPLACE(REPLACE(base_price_usd, ',', ''),'$', '')) IS NULL THEN NULL
+            WHEN TRY_CONVERT(DECIMAL(10,2), REPLACE(REPLACE(base_price_usd, ',', ''),'$', '')) < 0 THEN NULL 
+            ELSE TRY_CONVERT(DECIMAL(10,2), REPLACE(REPLACE(base_price_usd, ',', ''),'$', ''))
+        END AS base_price_usd
+    FROM bronze.products 
+)
+SELECT 
+    *
+FROM CleanBasePrice
+WHERE base_price_usd IS NULL ;
+
+--=============================================================================================
+--================================ cost_price_usd  column cleaning ============================
+--=============================================================================================
+-- data profiling for cost_price_usd
+SELECT 
+    cost_price_usd 
+FROM bronze.products 
+WHERE cost_price_usd IS NULL 
+   OR TRY_CONVERT(DECIMAL(10,2), REPLACE(REPLACE(cost_price_usd, ',', ''),'$', '')) IS NULL ;
+
+-- cost_price_usd cleaning and standardization
+WITH CleanCostPrice AS 
+(
+    SELECT 
+        CASE 
+            WHEN cost_price_usd IS NULL OR TRY_CONVERT(DECIMAL(10,2), REPLACE(REPLACE(cost_price_usd, ',', ''),'$', '')) IS NULL THEN NULL
+            WHEN TRY_CONVERT(DECIMAL(10,2), REPLACE(REPLACE(cost_price_usd, ',', ''),'$', '')) < 0 THEN NULL 
+            ELSE TRY_CONVERT(DECIMAL(10,2), REPLACE(REPLACE(cost_price_usd, ',', ''),'$', ''))
+        END AS cost_price_usd
+    FROM bronze.products 
+)
+SELECT 
+    *
+FROM CleanCostPrice
+WHERE cost_price_usd IS NULL ;
+
+--=============================================================================================
+--================================ gross_margin_pct  column cleaning ==========================
+--=============================================================================================
+-- data profiling for gross_margin_pct
+SELECT 
+    gross_margin_pct
+FROM bronze.products 
+WHERE gross_margin_pct IS NULL 
+   OR TRY_CONVERT(DECIMAL(5,1), gross_margin_pct) IS NULL
+   OR TRY_CONVERT(DECIMAL(5,1), gross_margin_pct) > 100 ;
+
+-- gross_margin_pct cleaning and standardization
+WITH CleanGrossMargin AS 
+(
+    SELECT 
+        CASE 
+            WHEN gross_margin_pct IS NULL OR TRY_CONVERT(DECIMAL(5,2), gross_margin_pct) IS NULL THEN NULL
+            WHEN TRY_CONVERT(DECIMAL(5,1), gross_margin_pct) > 100 THEN NULL 
+            ELSE TRY_CONVERT(DECIMAL(5,1), gross_margin_pct)
+        END AS gross_margin_pct
+    FROM bronze.products 
+)
+SELECT 
+    *
+FROM CleanGrossMargin
+WHERE gross_margin_pct IS NULL ;
+
+--=============================================================================================
+--================================== weight_kg  column cleaning ===============================
+--=============================================================================================
+-- data profiling for weight_kg
+SELECT 
+    weight_kg
+FROM bronze.products 
+WHERE weight_kg IS NULL 
+    OR TRY_CONVERT(DECIMAL(5,2), weight_kg) IS NULL 
+    OR TRY_CONVERT(DECIMAL(5,2), weight_kg) <= 0;
+
+-- weight_kg cleaning and standardization 
+WITH CleanWeightKG AS 
+(
+    SELECT 
+        CASE 
+            WHEN TRY_CONVERT(DECIMAL(5,2), weight_kg) IS NULL THEN NULL 
+            ELSE TRY_CONVERT(DECIMAL(5,2), weight_kg)
+        END as weight_kg
+    FROM bronze.products   
+)
+SELECT 
+    *
+FROM CleanWeightKG 
+WHERE weight_kg IS NULL ;
+
+--=============================================================================================
+--================================== is_available  column cleaning ============================
+--=============================================================================================
+-- data profiling for is_available
+SELECT 
+    is_available
+FROM bronze.products 
+WHERE is_available IS NULL 
+    OR is_available = '' ;
+
+-- is_available distribution analysis
+SELECT 
+    is_available,
+    COUNT(*) value_count,
+    CAST(ROUND(COUNT(*)*100/SUM(COUNT(*)) OVER(), 2) as NVARCHAR) + '%' as percentages 
+FROM bronze.products
+    GROUP BY is_available
+    ORDER BY value_count DESC ;
+
+-- is_available cleaning and standardazition 
+WITH is_av_analysis AS 
+(
+    SELECT 
+        CASE
+            WHEN LOWER(TRIM(is_available)) IN ('a','y','ye','1','t','tr','in','i') THEN 'Available'
+            WHEN LOWER(TRIM(is_available)) IN ('n','no','o','ou') THEN 'Not Available'
+            WHEN LOWER(TRIM(is_available)) IN ('d','di') THEN 'Discontinued'
+            ELSE 'Unknown'
+        END AS availability_status
+    FROM bronze.products
+)
+SELECT 
+    availability_status,
+    COUNT(*) as value_count,
+    CAST(ROUND(COUNT(*)*100/SUM(COUNT(*)) OVER(), 2) as NVARCHAR) + '%' as percentages 
+FROM is_av_analysis 
+GROUP BY availability_status
+ORDER BY value_count DESC ;
+
+--=============================================================================================
+--================================== stock_quantity  column cleaning ===========================
+--=============================================================================================
+-- stock_quentory data profiling 
+SELECT 
+    stock_quantity
+FROM bronze.products
+WHERE stock_quantity IS NULL 
+    OR TRY_CONVERT(INT , stock_quantity) IS NULL
+    OR TRY_CONVERT(INT , stock_quantity) < 0 ;
+
+-- stock_quantity NULL distribution across availability status
+SELECT 
+    is_available,
+    COUNT(*) AS total_count
+FROM bronze.products
+WHERE stock_quantity IS NULL
+GROUP BY is_available;
+
+-- stock_quantity NULL distribution across product categories
+SELECT 
+    category,
+    COUNT(*) AS total_count
+FROM bronze.products
+WHERE stock_quantity IS NULL
+GROUP BY category;
+
+SELECT 
+    brand,
+    category,
+    sub_category,
+    product_name 
+FROM bronze.products 
+WHERE stock_quantity IS NULL 
+--=============================================================================================
+--================================== reorder_level  column cleaning ===========================
+--=============================================================================================
+
+
+--=============================================================================================
+--================================== supplier_name  column cleaning ===========================
+--=============================================================================================
+
+
+--=============================================================================================
+--================================ supplier_country  column cleaning ==========================
+--=============================================================================================
+
+
+--=============================================================================================
+--================================== warranty_years  column cleaning ==========================
+--=============================================================================================
+
+
+--=============================================================================================
+--================================== rating_avg  column cleaning ==============================
+--=============================================================================================
+
+
+--=============================================================================================
+--================================== review_count  column cleaning ============================
+--=============================================================================================
+
+
+--=============================================================================================
+--================================== launched_date  column cleaning ===========================
+--=============================================================================================
+-- launched_date data overview 
+SELECT
+    launched_date
+FROM bronze.products ;
+
+-- launched_date pattern analysis
+WITH pattern_analysis AS 
+(
+SELECT 
+TRANSLATE(
+    TRIM(LOWER(launched_date)),
+    '0123456789abcdefghijklmnopqrstuvwxyz',
+    '9999999999aaaaaaaaaaaaaaaaaaaaaaaaaa'
+) date_pattern
+FROM bronze.products
+)
+SELECT 
+    date_pattern,
+    COUNT(*) as pattern_count,
+    CAST(ROUND(COUNT(*)*100/SUM(COUNT(*)) OVER(), 2) as NVARCHAR) + '%' as percentages 
+FROM pattern_analysis 
+GROUP BY date_pattern
+ORDER BY pattern_count DESC ;
+
+-- launched_date data profiling
+SELECT
+    launched_date
+FROM bronze.products
+WHERE launched_date IS NULL
+    OR TRY_CONVERT(DATE, launched_date) IS NULL
+    OR TRY_CONVERT(DATE, launched_date) > GETDATE() ;
+
+-- launched_date distribution analysis
+WITH clean_date AS 
+(
+    SELECT 
+        CASE 
+            WHEN launched_date LIKE '[A-Z][a-z][a-z][a-z] __, ____' THEN TRY_CONVERT(DATE ,launched_date)
+            WHEN launched_date LIKE '[A-Z][a-z][a-z] __, ____'      THEN TRY_CONVERT(DATE ,launched_date)
+            WHEN launched_date LIKE '____/__/__'                    THEN TRY_CONVERT(DATE ,launched_date)
+            WHEN launched_date LIKE '____-__-__'                    THEN TRY_CONVERT(DATE ,launched_date)
+        
+            WHEN launched_date LIKE '__/__/____' AND SUBSTRING(launched_date, 4, 2) > 12 THEN TRY_CONVERT(DATE, launched_date, 101)
+            WHEN launched_date LIKE '__/__/____' AND LEFT(launched_date, 2) > 12         THEN TRY_CONVERT(DATE, launched_date, 103)
+            WHEN launched_date LIKE '__-__-____' AND SUBSTRING(launched_date, 4, 2) > 12 THEN TRY_CONVERT(DATE, launched_date, 110)
+            WHEN launched_date LIKE '__-__-____' AND LEFT(launched_date, 2) > 12         THEN TRY_CONVERT(DATE, launched_date, 105)
+            ELSE TRY_CONVERT(DATE, launched_date)
+        END as launched_date
+    FROM bronze.products 
+)
+SELECT 
+    launched_date
+FROM clean_date 
+WHERE TRY_CONVERT(DATE, launched_date) IS NULL
+    OR TRY_CONVERT(DATE, launched_date) > GETDATE() ;
+    
+--=============================================================================================
+--================================== product_url  column cleaning =============================
+--=============================================================================================
+-- product_url data profiling 
+SELECT 
+      product_url 
+FROM  bronze.products 
+WHERE product_url IS NULL 
+    OR product_url = ''
+    OR product_url NOT LIKE 'https://%' 
+    OR product_url != TRIM(LOWER(product_url)) 
+    OR product_url != REPLACE(REPLACE(TRIM(LOWER(product_url)), CHAR(13), ''),CHAR(10), '') ;
+
+-- product_url cleaning and standardazition 
+WITH url_analysis AS 
+(
+SELECT 
+    CASE 
+        WHEN product_url IS NULL OR product_url = '' OR product_url NOT LIKE 'https://%' THEN 'Unknown'
+        ELSE REPLACE(REPLACE(TRIM(LOWER(product_url)), CHAR(13), ''),CHAR(10), '')
+    END as product_url
+FROM bronze.products 
+) 
+SELECT 
+    product_url 
+FROM url_analysis ;
+
 --#############################################################################################
 --############################## PRODUCTS CLEAN DATA ##########################################
 --#############################################################################################
+SELECT 
+     product_id
+    ,sku
+    ,product_name
+    ,brand
+    ,category
+    ,sub_category
+    ,department
+    ,base_price_usd
+    ,cost_price_usd
+    ,gross_margin_pct
+    ,weight_kg
+    ,is_available
+    ,stock_quantity
+    ,reorder_level
+    ,supplier_name
+    ,supplier_country
+    ,warranty_years
+    ,rating_avg
+    ,review_count
+    ,launched_date
+    ,product_url
+FROM 
+(
+    SELECT
+        CASE 
+            WHEN TRY_CONVERT(INT, product_id) IS NULL THEN NULL 
+            ELSE TRY_CONVERT(INT, product_id)
+        END as product_id
 
-SELECT TOP (1000) 
-    CASE 
-        WHEN TRY_CONVERT(INT, product_id) IS NULL THEN NULL 
-        ELSE TRY_CONVERT(INT, product_id)
-    END as product_id
+        ,CASE 
+            WHEN sku = '' OR sku IS NULL OR LEN(sku) != 13 THEN 'Unknown'
+            ELSE TRIM(UPPER(sku))
+        END as sku
 
-    ,CASE 
-        WHEN sku = '' OR sku IS NULL OR LEN(sku) != 13 THEN 'Unknown'
-        ELSE TRIM(UPPER(sku))
-    END as sku
+        ,CASE 
+            WHEN product_name = '' OR product_name IS NULL THEN 'Unknown'
+            ELSE TRIM(dbo.TitleCase(product_name))
+        END as product_name
 
-    ,CASE 
-        WHEN product_name = '' OR product_name IS NULL THEN 'Unknown'
-        ELSE TRIM(dbo.TitleCase(product_name))
-    END as product_name
+        ,CASE 
+            WHEN brand = '' OR brand IS NULL THEN 'Unknown'
+            ELSE TRIM(dbo.TitleCase(brand))
+        END as brand
 
-    ,CASE 
-        WHEN brand = '' OR brand IS NULL THEN 'Unknown'
-        ELSE TRIM(dbo.TitleCase(brand))
-    END as brand
+        ,CASE 
+            WHEN category IS NULL OR category = '' THEN 'Unknown'
+            ELSE TRIM(dbo.titleCase(category))
+        END AS category
 
-    ,CASE 
-        WHEN category IS NULL OR category = '' THEN 'Unknown'
-        ELSE TRIM(dbo.titleCase(category))
-    END AS category
+        ,CASE 
+            WHEN sub_category IS NULL OR sub_category = '' THEN 'Unknown'
+            ELSE dbo.TitleCase(TRIM(sub_category))
+        END AS sub_category
 
-    ,CASE 
-        WHEN sub_category IS NULL OR sub_category = '' THEN 'Unknown'
-        ELSE dbo.TitleCase(TRIM(sub_category))
-    END AS sub_category
+        ,CASE 
+            WHEN department IS NULL OR department = '' THEN 'Unknown'
+            ELSE dbo.TitleCase(TRIM(department))
+        END AS department
 
-    ,CASE 
-        WHEN department IS NULL OR department = '' THEN 'Unknown'
-        ELSE dbo.TitleCase(TRIM(department))
-    END AS department
+        ,CASE 
+            WHEN base_price_usd IS NULL OR TRY_CONVERT(DECIMAL(10,2), REPLACE(REPLACE(base_price_usd, ',', ''),'$', '')) IS NULL THEN NULL
+            WHEN TRY_CONVERT(DECIMAL(10,2), REPLACE(REPLACE(base_price_usd, ',', ''),'$', '')) < 0 THEN NULL 
+            ELSE TRY_CONVERT(DECIMAL(10,2), REPLACE(REPLACE(base_price_usd, ',', ''),'$', ''))
+        END AS base_price_usd
 
-      ,[base_price_usd]
+        ,CASE 
+            WHEN cost_price_usd IS NULL OR TRY_CONVERT(DECIMAL(10,2), REPLACE(REPLACE(cost_price_usd, ',', ''),'$', '')) IS NULL THEN NULL
+            WHEN TRY_CONVERT(DECIMAL(10,2), REPLACE(REPLACE(cost_price_usd, ',', ''),'$', '')) < 0 THEN NULL 
+            ELSE TRY_CONVERT(DECIMAL(10,2), REPLACE(REPLACE(cost_price_usd, ',', ''),'$', ''))
+        END AS cost_price_usd
 
-      ,[cost_price_usd]
+        ,CASE 
+            WHEN gross_margin_pct IS NULL OR TRY_CONVERT(DECIMAL(5,2), gross_margin_pct) IS NULL THEN NULL
+            WHEN TRY_CONVERT(DECIMAL(5,1), gross_margin_pct) > 100 THEN NULL 
+            ELSE TRY_CONVERT(DECIMAL(5,1), gross_margin_pct)
+        END AS gross_margin_pct
 
-      ,[gross_margin_pct]
+        ,CASE 
+            WHEN TRY_CONVERT(DECIMAL(5,2), weight_kg) IS NULL THEN NULL 
+            ELSE TRY_CONVERT(DECIMAL(5,2), weight_kg)
+        END as weight_kg
 
-      ,[weight_kg]
 
-      ,[is_available]
+        ,CASE
+            WHEN LOWER(TRIM(is_available)) IN ('a','y','ye','1','t','tr','in','i') THEN 'Available'
+            WHEN LOWER(TRIM(is_available)) IN ('n','no','o','ou') THEN 'Not Available'
+            WHEN LOWER(TRIM(is_available)) IN ('d','di') THEN 'Discontinued'
+            ELSE 'Unknown'
+        END AS is_available
 
-      ,[stock_quantity]
+        ,[stock_quantity]
+        ,[reorder_level]
+        ,[supplier_name]
+        ,[supplier_country]
+        ,[warranty_years]
+        ,[rating_avg]
+        ,[review_count]
 
-      ,[reorder_level]
+        ,CASE 
+            WHEN launched_date LIKE '[A-Z][a-z][a-z][a-z] __, ____' THEN TRY_CONVERT(DATE ,launched_date)
+            WHEN launched_date LIKE '[A-Z][a-z][a-z] __, ____'      THEN TRY_CONVERT(DATE ,launched_date)
+            WHEN launched_date LIKE '____/__/__'                    THEN TRY_CONVERT(DATE ,launched_date)
+            WHEN launched_date LIKE '____-__-__'                    THEN TRY_CONVERT(DATE ,launched_date)
+        
+            WHEN launched_date LIKE '__/__/____' AND SUBSTRING(launched_date, 4, 2) > 12 THEN TRY_CONVERT(DATE, launched_date, 101)
+            WHEN launched_date LIKE '__/__/____' AND LEFT(launched_date, 2) > 12         THEN TRY_CONVERT(DATE, launched_date, 103)
+            WHEN launched_date LIKE '__-__-____' AND SUBSTRING(launched_date, 4, 2) > 12 THEN TRY_CONVERT(DATE, launched_date, 110)
+            WHEN launched_date LIKE '__-__-____' AND LEFT(launched_date, 2) > 12         THEN TRY_CONVERT(DATE, launched_date, 105)
+            ELSE TRY_CONVERT(DATE, launched_date)
+        END as launched_date
 
-      ,[supplier_name]
-
-      ,[supplier_country]
-
-      ,[warranty_years]
-
-      ,[rating_avg]
-
-      ,[review_count]
-
-      ,[launched_date]
-
-      ,[product_url]
-
-  FROM [bronze].[products]
-
+        ,CASE 
+            WHEN product_url IS NULL OR product_url = '' OR product_url NOT LIKE 'https://%' THEN 'Unknown'
+            ELSE REPLACE(REPLACE(TRIM(LOWER(product_url)), CHAR(13), ''),CHAR(10), '')
+        END as product_url
+    FROM [bronze].[products]
+)t ;
